@@ -1,0 +1,7 @@
+{
+  "name": "Bin Rewards - Eco Loyalty",
+  "description": "Mobile-first tiered recycling rewards system. Earn points for every scan and redeem for eco-friendly products.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
