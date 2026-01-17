@@ -8,22 +8,50 @@ interface QRScannerProps {
 const VALID_QR_URL = "https://your-app.com/redeem?id=123";
 
 const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess }) => {
-  const [isScanning, setIsScanning] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const requestRef = useRef<number>(null);
 
   const startCamera = async () => {
-    setIsScanning(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute("playsinline", "true");
+        videoRef.current.play();
+        requestRef.current = requestAnimationFrame(tick);
       }
     } catch (err) {
       console.error("Camera error:", err);
-      setIsScanning(false);
       setError("Camera access denied. Please enable permissions.");
+    }
+  };
+
+  const tick = () => {
+    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+
+      canvas.height = videoRef.current.videoHeight;
+      canvas.width = videoRef.current.videoWidth;
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // @ts-ignore
+      const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+
+      if (code) {
+        processScan(code.data);
+      }
+    }
+    if (!hasScanned) {
+        requestRef.current = requestAnimationFrame(tick);
     }
   };
 
@@ -33,28 +61,22 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess }) => {
       setError(null);
       onScanSuccess();
     } else {
-      setError("Invalid QR Code. This bin is not registered in our reward system.");
-      // Clear error after 3 seconds
-      setTimeout(() => setError(null), 3000);
+      if (!error) {
+        setError("Invalid QR Code. This bin is not registered.");
+        setTimeout(() => setError(null), 3000);
+      }
     }
-  };
-
-  const simulateValidScan = () => {
-    processScan(VALID_QR_URL);
-  };
-
-  const simulateInvalidScan = () => {
-    processScan("https://other-app.com/wrong-code");
   };
 
   useEffect(() => {
     startCamera();
     return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
       if (videoRef.current?.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
       }
     };
-  }, []);
+  }, [hasScanned]);
 
   if (hasScanned) {
     return (
@@ -70,7 +92,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess }) => {
             <span className="text-emerald-600 font-black text-xl">+50 POINTS</span>
         </div>
         <button 
-          onClick={() => setHasScanned(false)}
+          onClick={() => {
+              setHasScanned(false);
+              setError(null);
+          }}
           className="block w-full max-w-[200px] mx-auto bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
         >
           Scan Next Bin
@@ -81,6 +106,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess }) => {
 
   return (
     <div className="space-y-6">
+      <canvas ref={canvasRef} className="hidden" />
       <div className="text-center">
         <h2 className="text-xl font-black text-slate-800">Bin Authenticator</h2>
         <p className="text-slate-400 text-sm">Validating Bin ID: <span className="font-mono bg-slate-100 px-1 rounded">123</span></p>
@@ -95,7 +121,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess }) => {
         />
         
         {/* Overlay Scanner UI */}
-        <div className="absolute inset-0 border-[50px] border-slate-900/40 flex items-center justify-center">
+        <div className="absolute inset-0 border-[50px] border-slate-900/40 flex items-center justify-center pointer-events-none">
           <div className="w-full h-full border-2 border-white/30 rounded-3xl relative">
              {/* Corners */}
              <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-emerald-400 -mt-1 -ml-1"></div>
@@ -115,19 +141,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess }) => {
             </div>
         )}
 
-        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3">
-            <button 
-                onClick={simulateValidScan}
-                className="bg-emerald-500/90 backdrop-blur-md px-6 py-3 rounded-full text-white text-[10px] font-black uppercase tracking-widest border border-emerald-300 shadow-lg active:scale-95 transition-all"
-            >
-                Simulate Correct Scan
-            </button>
-            <button 
-                onClick={simulateInvalidScan}
-                className="text-white/40 text-[9px] font-bold uppercase tracking-widest hover:text-white/70 transition-colors"
-            >
-                Try Invalid Scan
-            </button>
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center">
+             <p className="text-white/60 text-[10px] font-black uppercase tracking-widest bg-black/40 px-4 py-2 rounded-full backdrop-blur-sm">
+                Point camera at QR code
+             </p>
         </div>
       </div>
 

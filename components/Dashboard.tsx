@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { MembershipLevel, UserProfile, AIRewardRecommendation } from '../types';
 
 interface DashboardProps {
@@ -7,9 +7,12 @@ interface DashboardProps {
   onFetchAI: () => void;
   aiReward: AIRewardRecommendation | null;
   loadingAI: boolean;
+  onUpdateProfile: (updates: Partial<UserProfile>) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onFetchAI, aiReward, loadingAI }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onFetchAI, aiReward, loadingAI, onUpdateProfile }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const nextLevelMap = {
     [MembershipLevel.BRONZE]: { name: MembershipLevel.SILVER, goal: 1000 },
     [MembershipLevel.SILVER]: { name: MembershipLevel.GOLD, goal: 5000 },
@@ -19,12 +22,51 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onFetchAI, aiReward, loadin
   const nextInfo = nextLevelMap[user.level];
   const progress = Math.min(100, (user.totalEarned / nextInfo.goal) * 100);
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onUpdateProfile({ avatar: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const userAvatar = user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`;
+
   return (
     <div className="space-y-6">
-      {/* Google-like Welcome Card */}
+      {/* Welcome Card with Avatar Upload */}
       <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-slate-100 overflow-hidden border-2 border-emerald-400 shrink-0">
-          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt="" />
+        <div className="relative group shrink-0">
+          <button 
+            onClick={handleAvatarClick}
+            className="w-16 h-16 rounded-full bg-slate-100 overflow-hidden border-2 border-emerald-400 block relative transition-transform active:scale-90"
+          >
+            <img 
+              src={userAvatar} 
+              alt="Profile" 
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <span className="text-lg">📷</span>
+            </div>
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*" 
+            onChange={handleFileChange}
+          />
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white shadow-sm pointer-events-none">
+            ✏️
+          </div>
         </div>
         <div>
           <h2 className="text-xl font-bold text-slate-900 leading-tight">Welcome, {user.name.split(' ')[0]}</h2>

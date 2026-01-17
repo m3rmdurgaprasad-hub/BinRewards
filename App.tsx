@@ -36,7 +36,7 @@ const App: React.FC = () => {
   const handleStartAuth = () => setAuthState('account-selection');
   const handleGoToAdminLogin = () => setAuthState('admin-login');
   
-  const handleSelectAccount = (selectedUser: { name: string, email: string, avatar: string }) => {
+  const handleSelectAccount = (selectedUser: { name: string, email: string, avatar?: string }) => {
     setAuthState('otp-pending');
     (window as any)._pendingUser = selectedUser;
   };
@@ -45,8 +45,7 @@ const App: React.FC = () => {
     if (otp === '1234') {
       const pending = (window as any)._pendingUser || { 
         name: "Eco Enthusiast", 
-        email: "eco.warrior@gmail.com",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Eco"
+        email: "eco.warrior@gmail.com"
       };
       
       setUser({
@@ -89,6 +88,13 @@ const App: React.FC = () => {
     setAuthState('logged-out');
     setActiveTab('dashboard');
     setAiReward(null);
+  };
+
+  const handleUpdateProfile = (updates: Partial<UserProfile>) => {
+    setUser(prev => prev ? { ...prev, ...updates } : null);
+    if (updates.avatar) {
+      setNotification({ message: 'Profile picture updated!', type: 'success' });
+    }
   };
 
   const updatePoints = (amount: number, description: string, type: 'earn' | 'redeem') => {
@@ -160,6 +166,8 @@ const App: React.FC = () => {
     );
   }
 
+  const userAvatar = user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name}`;
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-28 font-sans select-none overflow-x-hidden">
       <header className="bg-white/80 backdrop-blur-lg border-b border-slate-100 sticky top-0 z-30 px-6 py-4 flex justify-between items-center shadow-sm">
@@ -176,11 +184,11 @@ const App: React.FC = () => {
             </div>
           </div>
           <button 
-              onClick={handleSignOut} 
+              onClick={() => setActiveTab('dashboard')} 
               className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border border-slate-200 hover:ring-2 hover:ring-emerald-200 transition-all flex items-center justify-center"
           >
             <img 
-              src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name}`} 
+              src={userAvatar} 
               alt="Profile" 
               className="w-full h-full object-cover"
             />
@@ -189,7 +197,15 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-md mx-auto px-5 py-6">
-        {activeTab === 'dashboard' && user && <Dashboard user={user} onFetchAI={fetchAIReward} aiReward={aiReward} loadingAI={loadingAI} />}
+        {activeTab === 'dashboard' && user && (
+          <Dashboard 
+            user={user} 
+            onFetchAI={fetchAIReward} 
+            aiReward={aiReward} 
+            loadingAI={loadingAI} 
+            onUpdateProfile={handleUpdateProfile}
+          />
+        )}
         {activeTab === 'store' && user && <RewardsStore points={user.points} rewards={rewards} onRedeem={updatePoints} aiReward={aiReward} />}
         {activeTab === 'history' && user && <TransactionHistory history={user.history} />}
         {activeTab === 'scan' && <QRScanner onScanSuccess={() => updatePoints(50, "QR Bin Scan", "earn")} />}
@@ -209,7 +225,7 @@ const App: React.FC = () => {
         </div>
         <NavBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon="🕒" label="History" />
         {user?.isAdmin ? (
-            <NavBtn active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon="🛠️" label="Admin" />
+            <NavBtn active={activeTab === 'admin'} onClick={() => setActiveTab('admin'} icon="🛠️" label="Admin" />
         ) : (
             <div className="w-16" /> /* Spacer */
         )}
